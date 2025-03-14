@@ -1,59 +1,35 @@
 import cv2
 import mediapipe as mp
-import av
 import streamlit as st
 from streamlit_webrtc import VideoTransformerBase, webrtc_streamer
 
-# Inject custom CSS to enlarge the video element.
-st.markdown(
-    """
-    <style>
-    /* Force all video elements to be larger */
-    video {
-        width: 100% !important;
-        height: 600px !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+st.title("Live Hand Landmark Detection using Streamlit and MediaPipe")
 
-st.title("Real-Time Hand Landmark Detection with WebRTC")
-
+# Define a video transformer that processes frames using MediaPipe Hands.
 class HandLandmarkTransformer(VideoTransformerBase):
     def __init__(self):
+        # Initialize MediaPipe Hands and the drawing utilities.
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=2,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.5
         )
-        self.mp_draw = mp.solutions.drawing_utils
+        self.mp_drawing = mp.solutions.drawing_utils
 
-    def transform(self, frame: av.VideoFrame) -> av.VideoFrame:
-        # Convert frame to NumPy array in BGR format.
+    def transform(self, frame):
+        # Convert the incoming frame to a NumPy array in BGR format.
         img = frame.to_ndarray(format="bgr24")
-        # Flip the image horizontally for a mirror effect.
-        img = cv2.flip(img, 1)
-        # Convert BGR to RGB for MediaPipe.
+        # Convert the BGR image to RGB for processing.
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         results = self.hands.process(img_rgb)
+        # If hands are detected, draw landmarks and connections.
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
-                self.mp_draw.draw_landmarks(
-                    img,
-                    hand_landmarks,
-                    self.mp_hands.HAND_CONNECTIONS,
-                    # Optionally, you can adjust drawing specs here
-                    landmark_drawing_spec=mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
-                    connection_drawing_spec=mp.solutions.drawing_styles.get_default_hand_connections_style()
+                self.mp_drawing.draw_landmarks(
+                    img, hand_landmarks, self.mp_hands.HAND_CONNECTIONS
                 )
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
+        return img
 
-webrtc_streamer(
-    key="hand_landmark",
-    video_transformer_factory=HandLandmarkTransformer,
-    # You can also try setting video_html_attrs, but the CSS injection often overrides defaults.
-    video_html_attrs={"style": {"width": "100%", "height": "600px"}}
-)
+# Use the webrtc_streamer to start capturing and processing the video.
+webrtc_streamer(key="hand-detection", video_transformer_factory=HandLandmarkTransformer)
