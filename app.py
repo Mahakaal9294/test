@@ -3,11 +3,12 @@ import mediapipe as mp
 import streamlit as st
 from streamlit_webrtc import VideoTransformerBase, webrtc_streamer
 
-st.title("Live Hand Landmark Detection with Streamlit and MediaPipe")
+st.header("Live Hand Landmark Detection")
 
-# Define a transformer class for processing video frames.
+# Transformer class for processing video frames
 class HandLandmarkTransformer(VideoTransformerBase):
     def __init__(self):
+        # Initialize MediaPipe Hands.
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             static_image_mode=False,
@@ -15,9 +16,10 @@ class HandLandmarkTransformer(VideoTransformerBase):
             min_detection_confidence=0.5
         )
         self.mp_drawing = mp.solutions.drawing_utils
+        st.write("Initialized hand detection transformer.")
 
     def transform(self, frame):
-        # Convert the incoming frame to a NumPy array (BGR format)
+        # Convert the frame to a numpy array (BGR format)
         img = frame.to_ndarray(format="bgr24")
         # Convert BGR to RGB for MediaPipe processing.
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -30,7 +32,7 @@ class HandLandmarkTransformer(VideoTransformerBase):
                 )
         return img
 
-# Use webrtc_streamer with explicit media_stream_constraints.
+# Start the WebRTC streamer.
 webrtc_streamer(
     key="hand-detection",
     video_transformer_factory=HandLandmarkTransformer,
