@@ -1,35 +1,49 @@
+import streamlit as st
 import cv2
 import mediapipe as mp
-import streamlit as st
-from streamlit_webrtc import VideoTransformerBase, webrtc_streamer
+import time
 
-st.title("Live Hand Landmark Detection using Streamlit and MediaPipe")
+st.title("Live Hand Landmark Detection")
 
-# Define a video transformer that processes frames using MediaPipe Hands.
-class HandLandmarkTransformer(VideoTransformerBase):
-    def __init__(self):
-        # Initialize MediaPipe Hands and the drawing utilities.
-        self.mp_hands = mp.solutions.hands
-        self.hands = self.mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=2,
-            min_detection_confidence=0.5
-        )
-        self.mp_drawing = mp.solutions.drawing_utils
+# A checkbox to start/stop the camera.
+start_camera = st.checkbox("Start Camera", value=False)
 
-    def transform(self, frame):
-        # Convert the incoming frame to a NumPy array in BGR format.
-        img = frame.to_ndarray(format="bgr24")
-        # Convert the BGR image to RGB for processing.
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = self.hands.process(img_rgb)
-        # If hands are detected, draw landmarks and connections.
-        if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
-                self.mp_drawing.draw_landmarks(
-                    img, hand_landmarks, self.mp_hands.HAND_CONNECTIONS
-                )
-        return img
+if start_camera:
+    # Initialize video capture from the default webcam.
+    cap = cv2.VideoCapture(0)
+    # Create a placeholder in the Streamlit app for the video frames.
+    frame_placeholder = st.empty()
 
-# Use the webrtc_streamer to start capturing and processing the video.
-webrtc_streamer(key="hand-detection", video_transformer_factory=HandLandmarkTransformer)
+    # Initialize MediaPipe Hands and the drawing utilities.
+    mp_hands = mp.solutions.hands
+    mp_drawing = mp.solutions.drawing_utils
+
+    with mp_hands.Hands(
+        static_image_mode=False,
+        max_num_hands=2,
+        min_detection_confidence=0.5) as hands:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Failed to capture frame from webcam. Exiting...")
+                break
+
+            # Flip the frame horizontally for a mirror-effect.
+            frame = cv2.flip(frame, 1)
+
+            # Convert the frame to RGB for MediaPipe processing.
+            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = hands.process(image_rgb)
+
+            # Draw hand landmarks if detected.
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    mp_drawing.draw_landmarks(
+                        frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+            # Display the resulting frame.
+            frame_placeholder.image(frame, channels="BGR")
+
+            # A short delay to yield control and make the video smoother.
+            time.sleep(0.03)
+    cap.release()
